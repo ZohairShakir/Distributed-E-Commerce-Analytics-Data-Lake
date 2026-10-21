@@ -1,7 +1,7 @@
 # Distributed E-Commerce Analytics Data Lake
 
-> Portfolio project status: **Phases 1–3 implemented and locally verified**. All generated records
-> are synthetic. AWS deployment, Gold processing, and performance claims remain explicitly
+> Portfolio project status: **Phases 1–4 implemented and locally verified**. All generated records
+> and business results are synthetic. AWS deployment and performance claims remain explicitly
 > unimplemented until their respective phases are tested.
 
 A local-first data lake project for a fictional multi-region e-commerce company. It is designed
@@ -20,7 +20,7 @@ flowchart LR
     M["Batch manifests + checkpoints"] --- B
 
     subgraph Storage modes
-      L["Local filesystem — Phases 1–3"]
+      L["Local filesystem — Phases 1–4"]
       S["Amazon S3 — planned, approval required"]
     end
 ```
@@ -50,7 +50,8 @@ PostgreSQL is intentionally not an analytical destination.
 | Malformed capture and source provenance | Implemented, tested locally | corrupt-record fixture + batch metadata |
 | Typed Silver transformations | Implemented, tested locally | end-to-end Spark integration test |
 | Deduplication, quarantine, quality report | Implemented, tested locally | reason-code fixture + reconciled report |
-| Gold analytics/Spark SQL | Planned for Phase 4 | not claimed |
+| Five reconciled Gold datasets | Implemented, tested locally | independent financial fixture |
+| Spark SQL analytics | Implemented, tested locally | `make analytics` + SQL query shapes |
 | Performance benchmarks | Planned for Phase 5 | no invented results |
 | Incremental reliability | Planned for Phase 6 | not claimed |
 | AWS S3/Glue/Athena/EMR | Planned, requires approval | no AWS resources created |
@@ -84,6 +85,7 @@ make generate-small
 make run-local
 make run-bronze
 make run-silver
+make analytics
 make test
 ```
 
@@ -114,9 +116,9 @@ make test-integration
 make shell
 ```
 
-`make analytics` and `make benchmark` currently stop with explanatory messages because those
-features belong to Phases 4 and 5. This is deliberate: the repository never presents scaffolding
-as completed work.
+`make benchmark` currently stops with an explanatory message because measured optimization work
+belongs to Phase 5. This is deliberate: the repository never presents scaffolding as completed
+work.
 
 ## Synthetic dataset
 
@@ -214,6 +216,17 @@ duration, and reconciliation results. Late arrival is annotated rather than reje
 
 Rules and exact observed counts are documented in [`docs/phase3.md`](docs/phase3.md).
 
+## Gold analytics
+
+Spark SQL builds daily revenue, product performance, customer activity, conversion funnel, and
+regional sales. Completed captures are positive, refunds are negative, cancelled orders are
+excluded, and accepted item totals must reconcile to one matching payment. Daily, product, and
+regional revenue totals must agree before publication. Funnel conversion is explicitly an
+event-count ratio.
+
+The verified Small run qualified 1,768 orders, excluded 215, and reconciled $2,501,057.56 in
+synthetic net revenue. See [`docs/phase4.md`](docs/phase4.md) for definitions and evidence.
+
 ## Documentation
 
 - [`Architecture and resource plan`](docs/architecture.md)
@@ -221,6 +234,7 @@ Rules and exact observed counts are documented in [`docs/phase3.md`](docs/phase3
 - [`Phase 1 learning and interview notes`](docs/phase1.md)
 - [`Phase 2 Bronze ingestion notes`](docs/phase2.md)
 - [`Phase 3 Silver and quality notes`](docs/phase3.md)
+- [`Phase 4 Gold analytics notes`](docs/phase4.md)
 - [`Progress checklist`](docs/progress.md)
 - [`Performance plan`](docs/performance.md)
 - [`AWS deployment guardrails`](docs/aws_deployment.md)
@@ -229,7 +243,7 @@ Rules and exact observed counts are documented in [`docs/phase3.md`](docs/phase3
 ## Known limitations
 
 - Spark currently runs on one machine; there are no multi-node performance claims.
-- The smoke output is not a Gold business dataset.
+- Gold outputs cover one batch; cross-batch analytical merging remains Phase 6 work.
 - Plain Parquet has no transactional upsert or snapshot isolation guarantee.
 - Bronze has a local atomic batch commit, but no durable cross-layer ledger or S3 commit protocol.
 - Silver quarantine exists, but cross-batch watermarks and late-data reprocessing do not yet.
@@ -237,8 +251,7 @@ Rules and exact observed counts are documented in [`docs/phase3.md`](docs/phase3
 
 ## Roadmap
 
-1. Phase 4: defined-grain Gold datasets and Spark SQL analytics.
-2. Phase 5: repeated CSV/Parquet, partition, join, and caching benchmarks.
-3. Phase 6: incremental batch ledger, safe commits, reruns, and recovery tests.
-4. Phase 7: optional IAM-authenticated S3 integration after explicit approval.
-5. Phase 8: final recruiter documentation and resume bullets using measured facts only.
+1. Phase 5: repeated CSV/Parquet, partition, join, and caching benchmarks.
+2. Phase 6: incremental batch ledger, safe commits, reruns, and recovery tests.
+3. Phase 7: optional IAM-authenticated S3 integration after explicit approval.
+4. Phase 8: final recruiter documentation and resume bullets using measured facts only.

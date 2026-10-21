@@ -44,8 +44,8 @@ run-silver:
 		--lake-root $(LAKE_ROOT) --batch-id batch-0001
 
 analytics:
-	@echo "Gold analytics are intentionally deferred to Phase 4; Phase 1 is the current verified scope."
-	@exit 2
+	$(COMPOSE) run --rm $(SERVICE) python -m aws_spark_data_platform.orchestration.gold_job \
+		--lake-root $(LAKE_ROOT) --batch-id batch-0001
 
 benchmark:
 	@echo "Performance benchmarks are intentionally deferred to Phase 5; no results are fabricated."

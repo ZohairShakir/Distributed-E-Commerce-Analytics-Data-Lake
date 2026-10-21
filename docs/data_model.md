@@ -68,15 +68,16 @@ Referential checks use accepted parent records. Consequently, facts attached to 
 are also rejected instead of entering Silver as orphans. Bronze remains the reproducible source
 when a quarantined record must be investigated or replayed.
 
-## Planned analytical grains
+## Implemented analytical grains
 
 | Gold dataset | Grain | Core metric interpretation |
 |---|---|---|
-| `daily_revenue` | event date × region | accepted captured sales net of defined refunds |
-| `product_performance` | product | units/revenue and rank among accepted orders |
-| `customer_activity` | customer | accepted order frequency, spend, last purchase |
+| `daily_revenue` | order date × region | qualified captures net of qualified refunds |
+| `product_performance` | product | net units/revenue and global dense rank |
+| `customer_activity` | customer | qualified frequency, signed spend, last completed purchase |
 | `conversion_funnel` | region for a reporting window | event-count funnel, not unique-user conversion |
 | `regional_sales` | region | revenue, distinct customers, accepted transactions |
 
-Exact cancellation, refund, missing-data, and duplicate rules will be encoded and tested in
-Phases 3–4 before these datasets are described as implemented.
+Gold qualifies completed captures and refunds only when accepted item totals reconcile to exactly
+one matching payment. Refund amounts and units are negative; cancelled orders are excluded. The
+same signed revenue is reconciled across daily, product, and regional outputs before publication.

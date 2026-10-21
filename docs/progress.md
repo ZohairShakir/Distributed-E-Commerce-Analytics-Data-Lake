@@ -10,7 +10,7 @@
 - [x] Verify Phase 1 with 8 passing unit/end-to-end Spark tests.
 - [x] Phase 2 — Bronze ingestion, immutable batch publication, and provenance metadata.
 - [x] Phase 3 — typed Silver transformations, quarantine, and quality report.
-- [ ] Phase 4 — Gold datasets and Spark SQL.
+- [x] Phase 4 — reconciled Gold datasets and Spark SQL analytics.
 - [ ] Phase 5 — measured optimization benchmarks.
 - [ ] Phase 6 — incremental processing and recovery.
 - [ ] Phase 7 — AWS integration after explicit approval.

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,7 @@ from aws_spark_data_platform.bronze import (
 from aws_spark_data_platform.config.settings import SparkSettings
 from aws_spark_data_platform.config.spark import create_spark_session
 from aws_spark_data_platform.generator import GenerationConfig, generate_dataset
+from aws_spark_data_platform.gold import GoldBatchAlreadyProcessedError, process_gold_batch
 from aws_spark_data_platform.orchestration.smoke_job import run_smoke_job
 from aws_spark_data_platform.silver import (
     SilverBatchAlreadyProcessedError,
@@ -235,3 +237,117 @@ def test_silver_processing_types_quarantines_deduplicates_and_reconciles(
 
     with pytest.raises(SilverBatchAlreadyProcessedError):
         process_silver_batch(spark, lake_root, "silver-test-001")
+
+
+@pytest.mark.integration
+def test_gold_analytics_use_reconciled_financial_rules(
+    tmp_path: Path,
+    spark: SparkSession,
+) -> None:
+    lake_root = tmp_path / "lake"
+    batch_id = "gold-test-001"
+    table_root = lake_root / "silver" / f"batch_id={batch_id}" / "tables"
+    tables = {
+        "customers": spark.createDataFrame(
+            [("C1",), ("C2",)],
+            "customer_id string",
+        ),
+        "products": spark.createDataFrame(
+            [("P1", "books"), ("P2", "sports")],
+            "product_id string, category string",
+        ),
+        "orders": spark.createDataFrame(
+            [
+                ("O1", "C1", datetime(2026, 10, 1, 10), "NA", "completed"),
+                ("O2", "C1", datetime(2026, 10, 2, 10), "NA", "refunded"),
+                ("O3", "C2", datetime(2026, 10, 1, 11), "EU", "cancelled"),
+                ("O4", "C2", datetime(2026, 10, 1, 12), "EU", "completed"),
+            ],
+            "order_id string, customer_id string, order_ts timestamp, region string, status string",
+        ),
+        "order_items": spark.createDataFrame(
+            [
+                ("O1", "P1", 2, Decimal("10.00"), Decimal("1.00")),
+                ("O2", "P1", 1, Decimal("10.00"), Decimal("0.00")),
+                ("O3", "P2", 1, Decimal("5.00"), Decimal("0.00")),
+                ("O4", "P2", 1, Decimal("5.00"), Decimal("0.00")),
+            ],
+            (
+                "order_id string, product_id string, quantity int, "
+                "unit_price decimal(18,2), discount_amount decimal(18,2)"
+            ),
+        ),
+        "payments": spark.createDataFrame(
+            [
+                ("O1", "capture", Decimal("19.00")),
+                ("O2", "refund", Decimal("10.00")),
+                ("O3", "capture", Decimal("5.00")),
+                ("O4", "capture", Decimal("4.00")),
+            ],
+            "order_id string, payment_event_type string, amount decimal(18,2)",
+        ),
+        "behavioral_events": spark.createDataFrame(
+            [
+                ("NA", "product_view"),
+                ("NA", "product_view"),
+                ("NA", "add_to_cart"),
+                ("NA", "purchase"),
+                ("EU", "product_view"),
+                ("EU", "purchase"),
+            ],
+            "region string, event_type string",
+        ),
+    }
+    for name, frame in tables.items():
+        frame.write.parquet(str(table_root / name))
+    silver_commit = lake_root / "metadata/silver_batches" / f"batch_id={batch_id}.json"
+    silver_commit.parent.mkdir(parents=True)
+    silver_commit.write_text('{"status":"committed"}\n', encoding="utf-8")
+
+    result = process_gold_batch(
+        spark,
+        lake_root,
+        batch_id,
+        processed_at=datetime(2026, 10, 3, tzinfo=UTC),
+    )
+
+    assert result.qualified_order_count == 2
+    assert result.excluded_order_count == 2
+    assert result.net_revenue == Decimal("9.00")
+    assert result.row_counts == {
+        "daily_revenue": 2,
+        "product_performance": 1,
+        "customer_activity": 1,
+        "conversion_funnel": 2,
+        "regional_sales": 1,
+    }
+
+    daily = spark.read.parquet(str(result.gold_path / "tables/daily_revenue"))
+    daily_rows = {(row["date"], row["region"]): row for row in daily.collect()}
+    assert daily_rows[(date(2026, 10, 1), "NA")]["revenue"] == Decimal("19.00")
+    assert daily_rows[(date(2026, 10, 2), "NA")]["revenue"] == Decimal("-10.00")
+
+    product = spark.read.parquet(str(result.gold_path / "tables/product_performance")).first()
+    assert product["product_id"] == "P1"
+    assert product["units_sold"] == 1
+    assert product["revenue"] == Decimal("9.00")
+    assert product["sales_rank"] == 1
+
+    customer = spark.read.parquet(str(result.gold_path / "tables/customer_activity")).first()
+    assert customer["customer_id"] == "C1"
+    assert customer["order_frequency"] == 2
+    assert customer["total_spend"] == Decimal("9.00")
+    assert customer["last_purchase_date"] == date(2026, 10, 1)
+
+    funnel = spark.read.parquet(str(result.gold_path / "tables/conversion_funnel"))
+    na_funnel = funnel.filter("region = 'NA'").first()
+    assert na_funnel["product_views"] == 2
+    assert na_funnel["purchase_events"] == 1
+    assert na_funnel["conversion_rate_percent"] == Decimal("50.0000")
+
+    report = json.loads(result.report_path.read_text(encoding="utf-8"))
+    assert report["revenue_reconciliation_passed"] is True
+    assert report["net_revenue"] == "9.00"
+
+    with pytest.raises(GoldBatchAlreadyProcessedError):
+        process_gold_batch(spark, lake_root, batch_id)
