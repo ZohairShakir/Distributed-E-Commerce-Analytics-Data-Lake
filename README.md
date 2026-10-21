@@ -1,8 +1,8 @@
 # Distributed E-Commerce Analytics Data Lake
 
-> Portfolio project status: **Phase 1 implemented and locally verified**. All generated records
-> are synthetic. AWS deployment, Bronze/Silver/Gold processing, and performance claims remain
-> explicitly unimplemented until their respective phases are tested.
+> Portfolio project status: **Phases 1–2 implemented and locally verified**. All generated records
+> are synthetic. AWS deployment, Silver/Gold processing, and performance claims remain explicitly
+> unimplemented until their respective phases are tested.
 
 A local-first data lake project for a fictional multi-region e-commerce company. It is designed
 to demonstrate PySpark execution, explicit schemas, Parquet output, deterministic source data,
@@ -20,7 +20,7 @@ flowchart LR
     M["Batch manifests + checkpoints"] --- B
 
     subgraph Storage modes
-      L["Local filesystem — Phase 1"]
+      L["Local filesystem — Phases 1–2"]
       S["Amazon S3 — planned, approval required"]
     end
 ```
@@ -46,7 +46,8 @@ PostgreSQL is intentionally not an analytical destination.
 | CSV and newline-delimited JSON sources | Implemented | generator output |
 | Explicit Spark source schemas | Implemented | `ingestion/schemas.py` |
 | First Spark job and Snappy Parquet output | Implemented, tested locally | integration test + `make run-local` |
-| Bronze ingestion | Planned for Phase 2 | not claimed |
+| Immutable Bronze ingestion | Implemented, tested locally | integration test + `make run-bronze` |
+| Malformed capture and source provenance | Implemented, tested locally | corrupt-record fixture + batch metadata |
 | Silver validation/quarantine | Planned for Phase 3 | not claimed |
 | Gold analytics/Spark SQL | Planned for Phase 4 | not claimed |
 | Performance benchmarks | Planned for Phase 5 | no invented results |
@@ -80,13 +81,15 @@ make setup
 make doctor
 make generate-small
 make run-local
+make run-bronze
 make test
 ```
 
 Generated input is written to `data/raw/synthetic/small/` in the persistent Docker volume; the
 smoke job writes event counts as Snappy-compressed Parquet under
-`data/phase1/smoke/event_counts/`. `make clean` removes only those two generated prefixes, and
-`make down` tears down Compose without deleting the data volume.
+`data/phase1/smoke/event_counts/`. Bronze writes immutable batches under `data/lake/bronze/`.
+`make clean` removes only project-generated raw, Phase 1, and lake prefixes, while `make down`
+tears down Compose without deleting the data volume.
 
 The default volume works even when macOS has not granted Docker access to Desktop/Documents.
 For live source bind mounts, grant Docker Desktop access to this repository and run commands with:
@@ -155,7 +158,7 @@ Pytest covers deterministic generation, referential integrity of valid records, 
 and an end-to-end local Spark test with independent row-count reconciliation. GitHub Actions uses
 Python 3.11 and Java 17, runs Ruff, and executes the lightweight Spark suite without AWS secrets.
 
-## Actual Phase 1 execution evidence
+## Actual execution evidence
 
 Verified locally on 2026-10-21 on an 8-core Apple ARM64 host with 8 GB RAM, using the pinned
 Linux container and `local[2]`:
@@ -176,7 +179,7 @@ Spark output event counts
   purchase:                979
   reconciled total:     10,000
 
-Automated tests: 8 passed (6.26 seconds warm; 25.71 seconds after Docker restart)
+Phase 1 automated tests: 8 passed (6.26 seconds warm; 25.71 seconds after Docker restart)
 ```
 
 The manifest recorded 17 intentionally invalid orders, 43 invalid order items, 18 invalid payment
@@ -184,11 +187,19 @@ events, and 102 invalid behavioral events for future quarantine tests. The event
 payload was 816 bytes (16 KB including filesystem metadata/allocation). These values are a single
 correctness run, not a throughput benchmark or distributed speedup claim.
 
+Phase 2 ingested the same six files and reconciled all 25,647 source rows into explicit-schema
+Bronze Parquet while retaining exact source copies and a checksum inventory. The committed batch
+occupied 5.4 MB across 31 files and completed in 29.77 seconds including container startup. Its
+syntax-malformed count was zero, as expected for the generated files; the integration fixture
+separately proved corrupt-record capture using truncated JSON. A duplicate rerun was rejected.
+These are correctness observations from one run, not performance claims.
+
 ## Documentation
 
 - [`Architecture and resource plan`](docs/architecture.md)
 - [`Source data model`](docs/data_model.md)
 - [`Phase 1 learning and interview notes`](docs/phase1.md)
+- [`Phase 2 Bronze ingestion notes`](docs/phase2.md)
 - [`Progress checklist`](docs/progress.md)
 - [`Performance plan`](docs/performance.md)
 - [`AWS deployment guardrails`](docs/aws_deployment.md)
@@ -199,15 +210,15 @@ correctness run, not a throughput benchmark or distributed speedup claim.
 - Spark currently runs on one machine; there are no multi-node performance claims.
 - The smoke output is not a Gold business dataset.
 - Plain Parquet has no transactional upsert or snapshot isolation guarantee.
-- No batch ledger, partial-failure commit protocol, quarantine, or late-data reprocessing exists yet.
+- Bronze has a local atomic batch commit, but no durable cross-layer ledger or S3 commit protocol.
+- Silver quarantine and late-data reprocessing do not exist yet.
 - No AWS resource has been created and no S3 integration has been tested.
 
 ## Roadmap
 
-1. Phase 2: traceable, idempotent Bronze ingestion with malformed-record handling.
-2. Phase 3: Silver typing, deduplication, validation, quarantine, and quality metrics.
-3. Phase 4: defined-grain Gold datasets and Spark SQL analytics.
-4. Phase 5: repeated CSV/Parquet, partition, join, and caching benchmarks.
-5. Phase 6: incremental batch ledger, safe commits, reruns, and recovery tests.
-6. Phase 7: optional IAM-authenticated S3 integration after explicit approval.
-7. Phase 8: final recruiter documentation and resume bullets using measured facts only.
+1. Phase 3: Silver typing, deduplication, validation, quarantine, and quality metrics.
+2. Phase 4: defined-grain Gold datasets and Spark SQL analytics.
+3. Phase 5: repeated CSV/Parquet, partition, join, and caching benchmarks.
+4. Phase 6: incremental batch ledger, safe commits, reruns, and recovery tests.
+5. Phase 7: optional IAM-authenticated S3 integration after explicit approval.
+6. Phase 8: final recruiter documentation and resume bullets using measured facts only.

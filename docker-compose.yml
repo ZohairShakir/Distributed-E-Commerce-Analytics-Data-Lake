@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: distributed-ecommerce-analytics-data-lake:phase1
+    image: distributed-ecommerce-analytics-data-lake:local
     working_dir: /opt/project
     environment:
       SPARK_MASTER: ${SPARK_MASTER:-local[2]}

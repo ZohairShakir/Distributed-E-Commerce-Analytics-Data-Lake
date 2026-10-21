@@ -42,12 +42,18 @@ flowchart TB
 Local storage will use `data/{bronze,silver,gold,quarantine,metadata}`. AWS mode will preserve the
 same logical prefixes behind a configurable URI. Code should not encode bucket names.
 
-## Proposed batch boundary
+## Implemented Bronze batch boundary
 
-Each source delivery has a `source_batch_id` and manifest. Phase 2 will fingerprint input files
-and register a batch before copying them into a unique Bronze path. Later phases will write to a
-temporary batch path, validate expected outputs, and publish commit metadata only after success.
-This provides safe reruns but is not called exactly-once processing.
+Phase 2 fingerprints each source delivery from its dataset names and file content, then rejects a
+reused batch ID or content-identical delivery. It writes exact source copies, explicit-schema
+Parquet, and commit metadata to a unique staging path before publishing one immutable batch
+directory with a local filesystem rename. The fingerprint does not depend on filenames, so a
+renamed redelivery is still detected. This provides safe Bronze reruns but is not called
+exactly-once processing.
+
+Later phases still need downstream checkpoints, recovery tests, and a durable batch ledger. An
+S3 implementation cannot assume a directory rename is atomic and must use an object-store-aware
+commit protocol.
 
 Plain Parquet cannot atomically update rows across files. Phase 6 will document rewrite-based
 handling and evaluate Iceberg only as an optional enhancement.
