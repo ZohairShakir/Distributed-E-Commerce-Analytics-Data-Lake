@@ -1,4 +1,4 @@
-.PHONY: setup doctor generate-small test test-unit test-integration lint format run-local run-bronze run-silver analytics benchmark clean down shell
+.PHONY: setup doctor generate-small test test-unit test-integration lint format run-local run-bronze run-silver run-pipeline analytics benchmark clean down shell
 
 COMPOSE := docker compose
 SERVICE := spark
@@ -42,6 +42,10 @@ run-bronze:
 run-silver:
 	$(COMPOSE) run --rm $(SERVICE) python -m aws_spark_data_platform.orchestration.silver_job \
 		--lake-root $(LAKE_ROOT) --batch-id batch-0001
+
+run-pipeline:
+	$(COMPOSE) run --rm $(SERVICE) python -m aws_spark_data_platform.orchestration.pipeline_job \
+		--source-root $(SMALL_ROOT) --lake-root $(LAKE_ROOT) --batch-id batch-0001
 
 analytics:
 	$(COMPOSE) run --rm $(SERVICE) python -m aws_spark_data_platform.orchestration.gold_job \

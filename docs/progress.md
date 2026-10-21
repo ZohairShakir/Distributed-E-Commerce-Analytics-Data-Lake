@@ -12,6 +12,6 @@
 - [x] Phase 3 — typed Silver transformations, quarantine, and quality report.
 - [x] Phase 4 — reconciled Gold datasets and Spark SQL analytics.
 - [x] Phase 5 — measured Small-profile optimization benchmarks and query-plan checks.
-- [ ] Phase 6 — incremental processing and recovery.
+- [x] Phase 6 — incremental ledger, watermarks, idempotent resume, and recovery archive.
 - [ ] Phase 7 — AWS integration after explicit approval.
 - [ ] Phase 8 — final portfolio packaging and evidence-based resume bullets.

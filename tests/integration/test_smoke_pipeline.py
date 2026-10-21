@@ -19,6 +19,10 @@ from aws_spark_data_platform.config.settings import SparkSettings
 from aws_spark_data_platform.config.spark import create_spark_session
 from aws_spark_data_platform.generator import GenerationConfig, generate_dataset
 from aws_spark_data_platform.gold import GoldBatchAlreadyProcessedError, process_gold_batch
+from aws_spark_data_platform.orchestration.incremental import (
+    SimulatedPipelineFailure,
+    run_incremental_pipeline,
+)
 from aws_spark_data_platform.orchestration.smoke_job import run_smoke_job
 from aws_spark_data_platform.silver import (
     SilverBatchAlreadyProcessedError,
@@ -351,3 +355,71 @@ def test_gold_analytics_use_reconciled_financial_rules(
 
     with pytest.raises(GoldBatchAlreadyProcessedError):
         process_gold_batch(spark, lake_root, batch_id)
+
+
+@pytest.mark.integration
+def test_incremental_pipeline_recovers_and_resumes_committed_stages(
+    tmp_path: Path,
+    spark: SparkSession,
+) -> None:
+    source_root = tmp_path / "source"
+    lake_root = tmp_path / "lake"
+    batch_id = "recovery-test-001"
+    generate_dataset(
+        source_root,
+        GenerationConfig(
+            event_count=100,
+            invalid_rate=0.0,
+            late_arrival_rate=0.10,
+            seed=31,
+            batch_id="recovery-source",
+        ),
+    )
+
+    with pytest.raises(SimulatedPipelineFailure, match="bronze"):
+        run_incremental_pipeline(
+            spark,
+            source_root,
+            lake_root,
+            batch_id,
+            fail_after_stage="bronze",
+        )
+
+    state_path = lake_root / "metadata/pipeline_batches" / f"batch_id={batch_id}.json"
+    failed_state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert failed_state["status"] == "failed"
+    assert failed_state["stages"] == {
+        "bronze": "committed",
+        "silver": "pending",
+        "gold": "pending",
+    }
+
+    orphan = lake_root / "silver" / f"batch_id={batch_id}" / "orphan.txt"
+    orphan.parent.mkdir(parents=True)
+    orphan.write_text("partial output", encoding="utf-8")
+
+    recovered = run_incremental_pipeline(spark, source_root, lake_root, batch_id)
+    assert recovered.status == "completed"
+    assert recovered.resumed is True
+    assert recovered.stages == {
+        "bronze": "committed",
+        "silver": "committed",
+        "gold": "committed",
+    }
+    completed_state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert completed_state["attempt"] == 2
+    assert completed_state["recovered_outputs"]
+    assert Path(completed_state["recovered_outputs"][0], "orphan.txt").read_text() == (
+        "partial output"
+    )
+    checkpoint = json.loads(
+        (lake_root / "metadata/checkpoints/behavioral_events.json").read_text(encoding="utf-8")
+    )
+    assert checkpoint["processed_batches"] == [batch_id]
+    assert checkpoint["max_event_ts"] == recovered.event_watermark["max_event_ts"]
+
+    repeated = run_incremental_pipeline(spark, source_root, lake_root, batch_id)
+    assert repeated.status == "completed"
+    assert repeated.resumed is True
+    repeated_state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert repeated_state["attempt"] == 2

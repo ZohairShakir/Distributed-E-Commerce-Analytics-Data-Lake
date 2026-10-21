@@ -51,12 +51,13 @@ directory with a local filesystem rename. The fingerprint does not depend on fil
 renamed redelivery is still detected. This provides safe Bronze reruns but is not called
 exactly-once processing.
 
-Later phases still need downstream checkpoints, recovery tests, and a durable batch ledger. An
-S3 implementation cannot assume a directory rename is atomic and must use an object-store-aware
-commit protocol.
+Phase 6 now adds a local batch ledger, per-batch lock, event watermark checkpoint, committed-stage
+discovery, and recoverable archival of uncommitted Silver/Gold outputs. State files are published
+with same-filesystem atomic replacement. The S3 warning still applies: this local control plane is
+not presented as an object-store transaction or exactly-once guarantee.
 
-Plain Parquet cannot atomically update rows across files. Phase 6 will document rewrite-based
-handling and evaluate Iceberg only as an optional enhancement.
+Plain Parquet cannot atomically update rows across files. Cross-batch Gold consolidation would
+need deterministic rewrites; Iceberg remains an optional enhancement for transactional updates.
 
 ## Resource estimates
 

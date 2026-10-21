@@ -1,6 +1,6 @@
 # Distributed E-Commerce Analytics Data Lake
 
-> Portfolio project status: **Phases 1–5 implemented and locally verified**. All generated records
+> Portfolio project status: **Phases 1–6 implemented and locally verified**. All generated records
 > and business results are synthetic. AWS deployment remains explicitly unimplemented until
 > approved and tested.
 
@@ -20,7 +20,7 @@ flowchart LR
     M["Batch manifests + checkpoints"] --- B
 
     subgraph Storage modes
-      L["Local filesystem — Phases 1–5"]
+      L["Local filesystem — Phases 1–6"]
       S["Amazon S3 — planned, approval required"]
     end
 ```
@@ -53,7 +53,7 @@ PostgreSQL is intentionally not an analytical destination.
 | Five reconciled Gold datasets | Implemented, tested locally | independent financial fixture |
 | Spark SQL analytics | Implemented, tested locally | `make analytics` + SQL query shapes |
 | Repeated optimization benchmarks | Implemented on Small profile | generated report + physical plans |
-| Incremental reliability | Planned for Phase 6 | not claimed |
+| Incremental ledger and recovery | Implemented, tested locally | injected-failure resume test |
 | AWS S3/Glue/Athena/EMR | Planned, requires approval | no AWS resources created |
 
 ## Pinned compatibility baseline
@@ -86,6 +86,7 @@ make run-local
 make run-bronze
 make run-silver
 make analytics
+make run-pipeline
 make test
 ```
 
@@ -235,6 +236,14 @@ so neither is misrepresented as a speedup at this scale. The partitioned layout 
 pruning but expanded two files to 30. See the full generated
 [`benchmark report`](docs/benchmark_results.md).
 
+## Incremental reliability
+
+The incremental runner maintains atomic per-batch state, an event watermark checkpoint, and a
+local exclusive lock. It discovers layer commit markers, resumes after failures, archives
+uncommitted partial outputs, and returns completed batches without duplicating analytics. An
+injected-failure integration test proves resume from committed Bronze through Silver and Gold.
+This is intentionally described as idempotent batch recovery, not exactly-once processing.
+
 ## Documentation
 
 - [`Architecture and resource plan`](docs/architecture.md)
@@ -243,6 +252,7 @@ pruning but expanded two files to 30. See the full generated
 - [`Phase 2 Bronze ingestion notes`](docs/phase2.md)
 - [`Phase 3 Silver and quality notes`](docs/phase3.md)
 - [`Phase 4 Gold analytics notes`](docs/phase4.md)
+- [`Phase 6 incremental reliability notes`](docs/phase6.md)
 - [`Progress checklist`](docs/progress.md)
 - [`Performance methodology`](docs/performance.md)
 - [`Measured benchmark report`](docs/benchmark_results.md)
@@ -254,12 +264,11 @@ pruning but expanded two files to 30. See the full generated
 - Spark currently runs on one machine; there are no multi-node performance claims.
 - Gold outputs cover one batch; cross-batch analytical merging remains Phase 6 work.
 - Plain Parquet has no transactional upsert or snapshot isolation guarantee.
-- Bronze has a local atomic batch commit, but no durable cross-layer ledger or S3 commit protocol.
+- The local cross-layer ledger is durable, but there is no S3-aware commit protocol.
 - Silver quarantine exists, but cross-batch watermarks and late-data reprocessing do not yet.
 - No AWS resource has been created and no S3 integration has been tested.
 
 ## Roadmap
 
-1. Phase 6: incremental batch ledger, safe commits, reruns, and recovery tests.
-2. Phase 7: optional IAM-authenticated S3 integration after explicit approval.
-3. Phase 8: final recruiter documentation and resume bullets using measured facts only.
+1. Phase 7: optional IAM-authenticated S3 integration after explicit approval.
+2. Phase 8: final recruiter documentation and resume bullets using measured facts only.
