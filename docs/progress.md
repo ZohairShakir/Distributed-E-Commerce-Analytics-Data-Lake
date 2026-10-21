@@ -9,7 +9,7 @@
 - [x] Run a basic Spark job and write Parquet.
 - [x] Verify Phase 1 with 8 passing unit/end-to-end Spark tests.
 - [x] Phase 2 — Bronze ingestion, immutable batch publication, and provenance metadata.
-- [ ] Phase 3 — Silver transformations, quarantine, and quality report.
+- [x] Phase 3 — typed Silver transformations, quarantine, and quality report.
 - [ ] Phase 4 — Gold datasets and Spark SQL.
 - [ ] Phase 5 — measured optimization benchmarks.
 - [ ] Phase 6 — incremental processing and recovery.

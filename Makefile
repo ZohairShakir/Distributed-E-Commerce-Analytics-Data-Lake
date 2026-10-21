@@ -1,4 +1,4 @@
-.PHONY: setup doctor generate-small test test-unit test-integration lint format run-local run-bronze analytics benchmark clean down shell
+.PHONY: setup doctor generate-small test test-unit test-integration lint format run-local run-bronze run-silver analytics benchmark clean down shell
 
 COMPOSE := docker compose
 SERVICE := spark
@@ -38,6 +38,10 @@ run-local:
 run-bronze:
 	$(COMPOSE) run --rm $(SERVICE) python -m aws_spark_data_platform.orchestration.bronze_job \
 		--source-root $(SMALL_ROOT) --lake-root $(LAKE_ROOT) --batch-id batch-0001
+
+run-silver:
+	$(COMPOSE) run --rm $(SERVICE) python -m aws_spark_data_platform.orchestration.silver_job \
+		--lake-root $(LAKE_ROOT) --batch-id batch-0001
 
 analytics:
 	@echo "Gold analytics are intentionally deferred to Phase 4; Phase 1 is the current verified scope."

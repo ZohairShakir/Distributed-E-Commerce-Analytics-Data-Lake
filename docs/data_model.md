@@ -56,6 +56,18 @@ The configured invalid rate independently injects unknown order customer IDs, ne
 prices, negative payment amounts, and either unknown event product IDs or unparseable event
 timestamps. The manifest reports actual counts. Valid references remain internally consistent.
 
+## Implemented Silver types and quality behavior
+
+Silver converts source timestamp text to Spark `timestamp`, money to `decimal(18,2)`, quantities
+to `integer`, and product active flags to `boolean`. Empty required strings normalize to null.
+Duplicate business keys, parse failures, invalid domains or amounts, and missing accepted
+references are written to quarantine with reason-code arrays. Accepted behavioral events retain
+`arrival_delay_seconds` and an `is_late` flag.
+
+Referential checks use accepted parent records. Consequently, facts attached to a rejected order
+are also rejected instead of entering Silver as orphans. Bronze remains the reproducible source
+when a quarantined record must be investigated or replayed.
+
 ## Planned analytical grains
 
 | Gold dataset | Grain | Core metric interpretation |

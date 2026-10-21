@@ -1,7 +1,7 @@
 # Distributed E-Commerce Analytics Data Lake
 
-> Portfolio project status: **Phases 1–2 implemented and locally verified**. All generated records
-> are synthetic. AWS deployment, Silver/Gold processing, and performance claims remain explicitly
+> Portfolio project status: **Phases 1–3 implemented and locally verified**. All generated records
+> are synthetic. AWS deployment, Gold processing, and performance claims remain explicitly
 > unimplemented until their respective phases are tested.
 
 A local-first data lake project for a fictional multi-region e-commerce company. It is designed
@@ -20,7 +20,7 @@ flowchart LR
     M["Batch manifests + checkpoints"] --- B
 
     subgraph Storage modes
-      L["Local filesystem — Phases 1–2"]
+      L["Local filesystem — Phases 1–3"]
       S["Amazon S3 — planned, approval required"]
     end
 ```
@@ -48,7 +48,8 @@ PostgreSQL is intentionally not an analytical destination.
 | First Spark job and Snappy Parquet output | Implemented, tested locally | integration test + `make run-local` |
 | Immutable Bronze ingestion | Implemented, tested locally | integration test + `make run-bronze` |
 | Malformed capture and source provenance | Implemented, tested locally | corrupt-record fixture + batch metadata |
-| Silver validation/quarantine | Planned for Phase 3 | not claimed |
+| Typed Silver transformations | Implemented, tested locally | end-to-end Spark integration test |
+| Deduplication, quarantine, quality report | Implemented, tested locally | reason-code fixture + reconciled report |
 | Gold analytics/Spark SQL | Planned for Phase 4 | not claimed |
 | Performance benchmarks | Planned for Phase 5 | no invented results |
 | Incremental reliability | Planned for Phase 6 | not claimed |
@@ -82,12 +83,15 @@ make doctor
 make generate-small
 make run-local
 make run-bronze
+make run-silver
 make test
 ```
 
 Generated input is written to `data/raw/synthetic/small/` in the persistent Docker volume; the
 smoke job writes event counts as Snappy-compressed Parquet under
 `data/phase1/smoke/event_counts/`. Bronze writes immutable batches under `data/lake/bronze/`.
+Silver writes accepted tables under `data/lake/silver/`, rejected rows under
+`data/lake/quarantine/`, and reconciled reports under `data/lake/quality/`.
 `make clean` removes only project-generated raw, Phase 1, and lake prefixes, while `make down`
 tears down Compose without deleting the data volume.
 
@@ -148,8 +152,8 @@ the Phase 5 benchmark harness records repeated runs and hardware metadata.
 ## Data model and quality intent
 
 Source grains and fields are specified in [`docs/data_model.md`](docs/data_model.md). All source
-fields enter Bronze as strings so malformed source values survive ingestion. Silver will create
-typed columns with native Spark expressions and send failures to quarantine with reason codes.
+fields enter Bronze as strings so malformed source values survive ingestion. Silver creates
+typed columns with native Spark expressions and sends failures to quarantine with reason codes.
 This avoids Python UDF serialization overhead and keeps transformations visible to Catalyst.
 
 ## Testing and CI
@@ -194,12 +198,29 @@ syntax-malformed count was zero, as expected for the generated files; the integr
 separately proved corrupt-record capture using truncated JSON. A duplicate rerun was rejected.
 These are correctness observations from one run, not performance claims.
 
+Phase 3 read all 25,647 Bronze rows, accepted 25,393, and quarantined 254 with reason codes. The
+accepted output retained 518 late events with delay metadata. Referential validation intentionally
+cascaded rejected orders to dependent items, payments, and purchase events, preventing orphans.
+The Spark work took 35.293315 seconds (39.49 seconds including CLI/container overhead), and a
+duplicate Silver rerun was refused. These are single-run correctness observations, not benchmark
+results.
+
+## Data quality
+
+Silver uses only native DataFrame expressions for parsing and validation. It checks required
+fields, domains, timestamps, amounts, currencies, duplicate keys, and accepted customer/product/
+order references. Every batch report includes read, accepted, rejected, duplicate, null, reason,
+duration, and reconciliation results. Late arrival is annotated rather than rejected.
+
+Rules and exact observed counts are documented in [`docs/phase3.md`](docs/phase3.md).
+
 ## Documentation
 
 - [`Architecture and resource plan`](docs/architecture.md)
 - [`Source data model`](docs/data_model.md)
 - [`Phase 1 learning and interview notes`](docs/phase1.md)
 - [`Phase 2 Bronze ingestion notes`](docs/phase2.md)
+- [`Phase 3 Silver and quality notes`](docs/phase3.md)
 - [`Progress checklist`](docs/progress.md)
 - [`Performance plan`](docs/performance.md)
 - [`AWS deployment guardrails`](docs/aws_deployment.md)
@@ -211,14 +232,13 @@ These are correctness observations from one run, not performance claims.
 - The smoke output is not a Gold business dataset.
 - Plain Parquet has no transactional upsert or snapshot isolation guarantee.
 - Bronze has a local atomic batch commit, but no durable cross-layer ledger or S3 commit protocol.
-- Silver quarantine and late-data reprocessing do not exist yet.
+- Silver quarantine exists, but cross-batch watermarks and late-data reprocessing do not yet.
 - No AWS resource has been created and no S3 integration has been tested.
 
 ## Roadmap
 
-1. Phase 3: Silver typing, deduplication, validation, quarantine, and quality metrics.
-2. Phase 4: defined-grain Gold datasets and Spark SQL analytics.
-3. Phase 5: repeated CSV/Parquet, partition, join, and caching benchmarks.
-4. Phase 6: incremental batch ledger, safe commits, reruns, and recovery tests.
-5. Phase 7: optional IAM-authenticated S3 integration after explicit approval.
-6. Phase 8: final recruiter documentation and resume bullets using measured facts only.
+1. Phase 4: defined-grain Gold datasets and Spark SQL analytics.
+2. Phase 5: repeated CSV/Parquet, partition, join, and caching benchmarks.
+3. Phase 6: incremental batch ledger, safe commits, reruns, and recovery tests.
+4. Phase 7: optional IAM-authenticated S3 integration after explicit approval.
+5. Phase 8: final recruiter documentation and resume bullets using measured facts only.

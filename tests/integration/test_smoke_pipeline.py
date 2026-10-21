@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
+from pyspark.sql.types import BooleanType, DecimalType, TimestampType
 
 from aws_spark_data_platform.bronze import (
     BatchAlreadyProcessedError,
@@ -16,6 +18,10 @@ from aws_spark_data_platform.config.settings import SparkSettings
 from aws_spark_data_platform.config.spark import create_spark_session
 from aws_spark_data_platform.generator import GenerationConfig, generate_dataset
 from aws_spark_data_platform.orchestration.smoke_job import run_smoke_job
+from aws_spark_data_platform.silver import (
+    SilverBatchAlreadyProcessedError,
+    process_silver_batch,
+)
 
 
 @pytest.fixture(scope="module")
@@ -143,3 +149,89 @@ def test_bronze_rejects_invalid_batch_identifier(tmp_path: Path, spark: SparkSes
 
     with pytest.raises(ValueError, match="batch_id"):
         ingest_bronze_batch(spark, source_root, tmp_path / "lake", "../unsafe")
+
+
+@pytest.mark.integration
+def test_silver_processing_types_quarantines_deduplicates_and_reconciles(
+    tmp_path: Path,
+    spark: SparkSession,
+) -> None:
+    source_root = tmp_path / "source"
+    lake_root = tmp_path / "lake"
+    generation = generate_dataset(
+        source_root,
+        GenerationConfig(
+            event_count=300,
+            invalid_rate=0.05,
+            late_arrival_rate=0.10,
+            seed=23,
+            batch_id="silver-source",
+        ),
+    )
+    customer_file = source_root / "customers.csv"
+    customer_lines = customer_file.read_text(encoding="utf-8").splitlines()
+    customer_file.write_text(
+        "\n".join(
+            [
+                *customer_lines,
+                customer_lines[1],
+                ",new,NA,2026-01-01T00:00:00Z,silver-source",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    with (source_root / "behavioral_events.jsonl").open("a", encoding="utf-8") as handle:
+        handle.write('{"event_id":"truncated"\n')
+
+    ingest_bronze_batch(
+        spark,
+        source_root,
+        lake_root,
+        "silver-test-001",
+        ingested_at=datetime(2026, 1, 2, tzinfo=UTC),
+    )
+    result = process_silver_batch(
+        spark,
+        lake_root,
+        "silver-test-001",
+        processed_at=datetime(2026, 1, 3, tzinfo=UTC),
+    )
+
+    assert result.records_read["customers"] == generation.record_counts["customers"] + 2
+    assert result.records_read["behavioral_events"] == generation.record_counts["events"] + 1
+    assert result.duplicate_counts["customers"] == 1
+    assert result.null_counts["customers"] == 1
+    assert result.reason_counts["customers"]["DUPLICATE_RECORD"] == 1
+    assert result.reason_counts["customers"]["NULL_CUSTOMER_ID"] == 1
+    assert result.reason_counts["behavioral_events"]["MALFORMED_RECORD"] == 1
+    assert result.records_rejected["orders"] == generation.invalid_counts["orders"]
+    assert result.records_rejected["order_items"] >= generation.invalid_counts["order_items"]
+    assert result.records_rejected["payments"] >= generation.invalid_counts["payments"]
+    assert result.records_rejected["behavioral_events"] >= generation.invalid_counts["events"] + 1
+    for dataset, records_read in result.records_read.items():
+        assert records_read == (result.records_accepted[dataset] + result.records_rejected[dataset])
+
+    products = spark.read.parquet(str(result.silver_path / "tables/products"))
+    events = spark.read.parquet(str(result.silver_path / "tables/behavioral_events"))
+    assert isinstance(products.schema["unit_price"].dataType, DecimalType)
+    assert isinstance(products.schema["is_active"].dataType, BooleanType)
+    assert isinstance(events.schema["event_ts"].dataType, TimestampType)
+    assert isinstance(events.schema["received_at"].dataType, TimestampType)
+    assert isinstance(events.schema["is_late"].dataType, BooleanType)
+    assert 0 < events.filter("is_late").count() <= generation.late_event_count
+
+    customer_quarantine = spark.read.parquet(str(result.quarantine_path / "customers"))
+    duplicate = customer_quarantine.filter(
+        F.array_contains("_validation_reasons", "DUPLICATE_RECORD")
+    ).first()
+    assert duplicate["customer_id"] is not None
+
+    report = json.loads(result.quality_report_path.read_text(encoding="utf-8"))
+    assert report["status"] == "committed"
+    assert report["reconciliation_passed"] is True
+    assert report["processed_at_utc"] == "2026-01-03T00:00:00Z"
+    assert (lake_root / "metadata/silver_batches/batch_id=silver-test-001.json").is_file()
+
+    with pytest.raises(SilverBatchAlreadyProcessedError):
+        process_silver_batch(spark, lake_root, "silver-test-001")

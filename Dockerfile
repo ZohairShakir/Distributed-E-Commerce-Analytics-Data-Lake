@@ -20,15 +20,10 @@ RUN java_home="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")" \
 ENV JAVA_HOME=/opt/java-home
 
 WORKDIR /opt/project
+COPY requirements.lock ./
+# Keep the 318 MB PySpark layer reusable when project metadata or application code changes.
+RUN python -m pip install --no-cache-dir --requirement requirements.lock
 COPY pyproject.toml ./
-# Keep the 318 MB PySpark layer reusable when application code changes.
-RUN python -m pip install --no-cache-dir \
-      setuptools==80.9.0 \
-      boto3==1.43.116 \
-      pyspark==3.5.9 \
-      pytest==9.1.1 \
-      pytest-cov==7.0.0 \
-      ruff==0.17.1
 COPY README.md ./
 COPY src ./src
 RUN python -m pip install --no-cache-dir --no-deps --no-build-isolation .
