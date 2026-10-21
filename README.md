@@ -1,8 +1,8 @@
 # Distributed E-Commerce Analytics Data Lake
 
-> Portfolio project status: **Phases 1–4 implemented and locally verified**. All generated records
-> and business results are synthetic. AWS deployment and performance claims remain explicitly
-> unimplemented until their respective phases are tested.
+> Portfolio project status: **Phases 1–5 implemented and locally verified**. All generated records
+> and business results are synthetic. AWS deployment remains explicitly unimplemented until
+> approved and tested.
 
 A local-first data lake project for a fictional multi-region e-commerce company. It is designed
 to demonstrate PySpark execution, explicit schemas, Parquet output, deterministic source data,
@@ -20,7 +20,7 @@ flowchart LR
     M["Batch manifests + checkpoints"] --- B
 
     subgraph Storage modes
-      L["Local filesystem — Phases 1–4"]
+      L["Local filesystem — Phases 1–5"]
       S["Amazon S3 — planned, approval required"]
     end
 ```
@@ -52,7 +52,7 @@ PostgreSQL is intentionally not an analytical destination.
 | Deduplication, quarantine, quality report | Implemented, tested locally | reason-code fixture + reconciled report |
 | Five reconciled Gold datasets | Implemented, tested locally | independent financial fixture |
 | Spark SQL analytics | Implemented, tested locally | `make analytics` + SQL query shapes |
-| Performance benchmarks | Planned for Phase 5 | no invented results |
+| Repeated optimization benchmarks | Implemented on Small profile | generated report + physical plans |
 | Incremental reliability | Planned for Phase 6 | not claimed |
 | AWS S3/Glue/Athena/EMR | Planned, requires approval | no AWS resources created |
 
@@ -116,9 +116,8 @@ make test-integration
 make shell
 ```
 
-`make benchmark` currently stops with an explanatory message because measured optimization work
-belongs to Phase 5. This is deliberate: the repository never presents scaffolding as completed
-work.
+`make benchmark` runs three repetitions of each paired experiment and generates JSON and Markdown
+under `data/lake/benchmarks/run_id=<timestamp>/`.
 
 ## Synthetic dataset
 
@@ -147,9 +146,9 @@ The default uses two Spark worker threads, 1 GB driver memory, four shuffle part
 Plan for roughly 1–2 GB of free disk for the image/dependency cache plus generated data. Small
 data is appropriate for correctness; medium and larger profiles are for later measured tests.
 
-Planning estimates—not benchmark results—are documented in
-[`docs/architecture.md`](docs/architecture.md). Actual sizes and timings will only appear after
-the Phase 5 benchmark harness records repeated runs and hardware metadata.
+Planning estimates are documented in [`docs/architecture.md`](docs/architecture.md). Repeated
+Small-profile measurements and hardware metadata are in
+[`docs/benchmark_results.md`](docs/benchmark_results.md).
 
 ## Data model and quality intent
 
@@ -227,6 +226,15 @@ event-count ratio.
 The verified Small run qualified 1,768 orders, excluded 215, and reconciled $2,501,057.56 in
 synthetic net revenue. See [`docs/phase4.md`](docs/phase4.md) for definitions and evidence.
 
+## Measured Spark optimizations
+
+The Small-profile harness compared CSV/Parquet scans, forced shuffle/broadcast joins, and
+unpartitioned/date-partitioned filters. Broadcast improved the warm median by an observed 1.165×.
+Parquet was 0.862× the CSV warm baseline, and partitioning was 0.997× the unpartitioned baseline,
+so neither is misrepresented as a speedup at this scale. The partitioned layout did demonstrate
+pruning but expanded two files to 30. See the full generated
+[`benchmark report`](docs/benchmark_results.md).
+
 ## Documentation
 
 - [`Architecture and resource plan`](docs/architecture.md)
@@ -236,7 +244,8 @@ synthetic net revenue. See [`docs/phase4.md`](docs/phase4.md) for definitions an
 - [`Phase 3 Silver and quality notes`](docs/phase3.md)
 - [`Phase 4 Gold analytics notes`](docs/phase4.md)
 - [`Progress checklist`](docs/progress.md)
-- [`Performance plan`](docs/performance.md)
+- [`Performance methodology`](docs/performance.md)
+- [`Measured benchmark report`](docs/benchmark_results.md)
 - [`AWS deployment guardrails`](docs/aws_deployment.md)
 - [`Cost-estimation framework`](docs/cost_estimation.md)
 
@@ -251,7 +260,6 @@ synthetic net revenue. See [`docs/phase4.md`](docs/phase4.md) for definitions an
 
 ## Roadmap
 
-1. Phase 5: repeated CSV/Parquet, partition, join, and caching benchmarks.
-2. Phase 6: incremental batch ledger, safe commits, reruns, and recovery tests.
-3. Phase 7: optional IAM-authenticated S3 integration after explicit approval.
-4. Phase 8: final recruiter documentation and resume bullets using measured facts only.
+1. Phase 6: incremental batch ledger, safe commits, reruns, and recovery tests.
+2. Phase 7: optional IAM-authenticated S3 integration after explicit approval.
+3. Phase 8: final recruiter documentation and resume bullets using measured facts only.

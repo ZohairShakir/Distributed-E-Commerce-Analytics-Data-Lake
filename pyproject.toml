@@ -26,6 +26,7 @@ spark-smoke-job = "aws_spark_data_platform.orchestration.smoke_job:main"
 bronze-ingestion = "aws_spark_data_platform.orchestration.bronze_job:main"
 silver-processing = "aws_spark_data_platform.orchestration.silver_job:main"
 gold-analytics = "aws_spark_data_platform.orchestration.gold_job:main"
+spark-benchmark = "aws_spark_data_platform.orchestration.benchmark_job:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

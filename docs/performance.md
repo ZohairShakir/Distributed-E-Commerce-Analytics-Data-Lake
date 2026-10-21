@@ -1,9 +1,14 @@
-# Performance benchmark plan
+# Performance benchmark methodology
 
-Status: planned for Phase 5. No benchmark numbers or speedup claims exist yet.
+Status: Phase 5 Small-profile experiments implemented and run. See
+[`benchmark_results.md`](benchmark_results.md) for exact measurements.
 
-The harness will record cold and warm runs, input/output byte sizes, row counts, compression,
-Spark configuration, run count, CPU/memory environment, elapsed wall time, file count, and
-physical-plan observations. Initial experiments will compare CSV with Parquet, partitioned with
-unpartitioned reads, regular with broadcast joins, and recomputation with caching. Each conclusion
-will report variance and acknowledge regressions.
+The harness records cold and warm runs, byte sizes, row counts, Spark configuration, run count,
+CPU/memory environment, elapsed time, file count, and physical-plan observations. It compares CSV
+with Parquet scans, unpartitioned with event-date-partitioned reads, and forced sort-merge with
+broadcast-hash joins.
+
+Each variant runs three times. The first observation is labeled cold; the other two form the warm
+median. The harness preserves regressions and warns that OS caching and local scheduler overhead
+remain confounders. A candidate is never called an optimization solely because its plan looks
+different. Caching and shuffle-partition experiments remain useful future additions.

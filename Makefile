@@ -48,8 +48,8 @@ analytics:
 		--lake-root $(LAKE_ROOT) --batch-id batch-0001
 
 benchmark:
-	@echo "Performance benchmarks are intentionally deferred to Phase 5; no results are fabricated."
-	@exit 2
+	$(COMPOSE) run --rm $(SERVICE) python -m aws_spark_data_platform.orchestration.benchmark_job \
+		--lake-root $(LAKE_ROOT) --batch-id batch-0001 --repetitions 3
 
 clean:
 	$(COMPOSE) run --rm $(SERVICE) python scripts/clean.py
