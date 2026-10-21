@@ -1,0 +1,28 @@
+services:
+  spark:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: distributed-ecommerce-analytics-data-lake:phase1
+    working_dir: /opt/project
+    environment:
+      SPARK_MASTER: ${SPARK_MASTER:-local[2]}
+      SPARK_DRIVER_MEMORY: ${SPARK_DRIVER_MEMORY:-1g}
+      SPARK_SQL_SHUFFLE_PARTITIONS: ${SPARK_SQL_SHUFFLE_PARTITIONS:-4}
+      SPARK_LOCAL_IP: 127.0.0.1
+      PYSPARK_PYTHON: ${PYSPARK_PYTHON:-python3}
+      PYTHONPATH: /opt/project/src
+      STORAGE_MODE: ${STORAGE_MODE:-local}
+      LOCAL_DATA_ROOT: ${LOCAL_DATA_ROOT:-/opt/project/data}
+      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      S3_BUCKET: ${S3_BUCKET:-}
+    volumes:
+      - spark-data:/opt/project/data
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+    init: true
+
+volumes:
+  spark-data:

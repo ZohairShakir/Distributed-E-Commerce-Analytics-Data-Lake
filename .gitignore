@@ -1,0 +1,22 @@
+.DS_Store
+.env
+.idea/
+.vscode/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.venv/
+build/
+dist/
+
+# Generated datasets and Spark runtime files
+data/*
+!data/.gitkeep
+spark-warehouse/
+metastore_db/
+derby.log
+*.log

@@ -1,0 +1,9 @@
+# Optional developer override. This requires Docker Desktop access to the repository folder.
+services:
+  spark:
+    working_dir: /workspace
+    environment:
+      PYTHONPATH: /workspace/src
+      LOCAL_DATA_ROOT: /workspace/data
+    volumes:
+      - .:/workspace
