@@ -1,8 +1,8 @@
 # Distributed E-Commerce Analytics Data Lake
 
-> Portfolio project status: **Phases 1–6 implemented and locally verified**. All generated records
-> and business results are synthetic. AWS deployment remains explicitly unimplemented until
-> approved and tested.
+> Portfolio project status: **Local core Phases 1–6 and portfolio packaging are implemented and
+> verified**. All generated records and business results are synthetic. Optional AWS deployment
+> remains explicitly unimplemented until approved and tested.
 
 A local-first data lake project for a fictional multi-region e-commerce company. It is designed
 to demonstrate PySpark execution, explicit schemas, Parquet output, deterministic source data,
@@ -161,8 +161,9 @@ This avoids Python UDF serialization overhead and keeps transformations visible 
 ## Testing and CI
 
 Pytest covers deterministic generation, referential integrity of valid records, safety checks,
-and an end-to-end local Spark test with independent row-count reconciliation. GitHub Actions uses
-Python 3.11 and Java 17, runs Ruff, and executes the lightweight Spark suite without AWS secrets.
+Bronze idempotency, Silver quality, independently calculated Gold finance, benchmark helpers, and
+injected-failure recovery. The current suite has 15 passing tests. GitHub Actions uses Python 3.11
+and Java 17, runs Ruff, and executes the local Spark suite without AWS secrets.
 
 ## Actual execution evidence
 
@@ -243,6 +244,14 @@ local exclusive lock. It discovers layer commit markers, resumes after failures,
 uncommitted partial outputs, and returns completed batches without duplicating analytics. An
 injected-failure integration test proves resume from committed Bronze through Silver and Gold.
 This is intentionally described as idempotent batch recovery, not exactly-once processing.
+The final local suite completed with 15 passing tests in 75.01 seconds.
+
+## Resume and interview material
+
+Three evidence-based resume bullets and concise explanations of Spark, shuffles, broadcasting,
+partition pruning, medallion layers, incremental processing, skew, and the EMR deployment path are
+in [`docs/portfolio.md`](docs/portfolio.md). They explicitly distinguish local Spark work from
+unperformed AWS or multi-node execution.
 
 ## Documentation
 
@@ -253,6 +262,7 @@ This is intentionally described as idempotent batch recovery, not exactly-once p
 - [`Phase 3 Silver and quality notes`](docs/phase3.md)
 - [`Phase 4 Gold analytics notes`](docs/phase4.md)
 - [`Phase 6 incremental reliability notes`](docs/phase6.md)
+- [`Resume and interview guide`](docs/portfolio.md)
 - [`Progress checklist`](docs/progress.md)
 - [`Performance methodology`](docs/performance.md)
 - [`Measured benchmark report`](docs/benchmark_results.md)
@@ -268,7 +278,8 @@ This is intentionally described as idempotent batch recovery, not exactly-once p
 - Silver quarantine exists, but cross-batch watermarks and late-data reprocessing do not yet.
 - No AWS resource has been created and no S3 integration has been tested.
 
-## Roadmap
+## Optional next step
 
-1. Phase 7: optional IAM-authenticated S3 integration after explicit approval.
-2. Phase 8: final recruiter documentation and resume bullets using measured facts only.
+Phase 7 is an optional IAM-authenticated S3 integration and still requires explicit approval,
+current regional cost review, a small-data cap, and cleanup verification. Glue, Athena, and EMR
+remain independent optional extensions rather than implied experience.

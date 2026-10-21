@@ -83,4 +83,5 @@ single-run correctness observations, not benchmark results.
 - Global ranking is a single-partition summary operation and can bottleneck on a huge catalog.
 - Negative net revenue and units are valid when refunds exceed completed sales in a group.
 - Plain Parquet has no snapshot isolation across multiple batch directories.
-- Gold currently represents one batch. Cross-batch incremental merging and recovery are Phase 6.
+- Gold represents one batch. Phase 6 can resume failed batches, but cross-batch Gold consolidation
+  remains a future transactional-rewrite decision.

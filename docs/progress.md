@@ -14,4 +14,4 @@
 - [x] Phase 5 — measured Small-profile optimization benchmarks and query-plan checks.
 - [x] Phase 6 — incremental ledger, watermarks, idempotent resume, and recovery archive.
 - [ ] Phase 7 — AWS integration after explicit approval.
-- [ ] Phase 8 — final portfolio packaging and evidence-based resume bullets.
+- [x] Phase 8 — local portfolio packaging and evidence-based resume/interview material.
